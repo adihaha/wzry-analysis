@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>王者荣耀英雄对位分析</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #18202e;
+    --panel-2: #1f2937;
+    --line: #2a3547;
+    --text: #e6edf3;
+    --muted: #9aa7b8;
+    --accent: #f5b942;
+    --warrior: #e67e22;
+    --tank: #2980b9;
+    --mage: #9b59b6;
+    --marksman: #27ae60;
+    --assassin: #e74c3c;
+    --support: #1abc9c;
+    --unknown: #6b7785;
+    --good: #2ecc71;
+    --counter: #3498db;
+    --feared: #e67e22;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 800px at 70% -10%, #1c2740 0%, var(--bg) 55%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 22px 24px 14px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(245,185,66,.08), transparent);
+    position: relative;
+  }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+  header h1 .logo { color: var(--accent); }
+  header p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  .topbar { position: absolute; top: 18px; right: 24px; display: flex; gap: 10px; align-items: center; }
+  .gear {
+    background: var(--panel); border: 1px solid var(--line); color: var(--text);
+    width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 18px;
+  }
+  .gear:hover { border-color: var(--accent); }
+  .mode-pill {
+    font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--muted); cursor: pointer; user-select: none;
+  }
+  .mode-pill.on { color: #0f1420; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 24px 60px; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  .search {
+    flex: 1; min-width: 180px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; color: var(--text); font-size: 14px;
+  }
+  .search::placeholder { color: var(--muted); }
+  .free { display: flex; gap: 8px; flex: 1.2; min-width: 240px; }
+  .free input {
+    flex: 1; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; color: var(--text); font-size: 14px;
+  }
+  .free button {
+    background: var(--accent); border: none; color: #0f1420; font-weight: 600;
+    border-radius: 10px; padding: 0 16px; cursor: pointer; font-size: 14px;
+  }
+  .role-tabs { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+  .role-tab {
+    border: 1px solid var(--line); background: var(--panel);
+    color: var(--muted); padding: 7px 12px; border-radius: 999px;
+    font-size: 13px; cursor: pointer; transition: .15s;
+  }
+  .role-tab:hover { color: var(--text); }
+  .role-tab.active { color: #0f1420; font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 10px; }
+  .hero-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 8px; text-align: center; cursor: pointer; transition: .15s; position: relative;
+    border-top: 3px solid var(--line);
+  }
+  .hero-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .hero-card .ava {
+    width: 46px; height: 46px; margin: 0 auto 8px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700; color: #fff;
+  }
+  .hero-card .nm { font-size: 14px; font-weight: 600; }
+  .hero-card .tt { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .detail { display: none; }
+  .detail.show { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .back {
+    background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+    padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-bottom: 14px;
+  }
+  .back:hover { color: var(--text); }
+  .src-badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+  .src-badge.llm { background: rgba(245,185,66,.15); color: var(--accent); border: 1px solid var(--accent); }
+  .src-badge.local { background: rgba(52,152,219,.12); color: var(--counter); border: 1px solid var(--counter); }
+
+  .hero-head {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+    border-left: 5px solid var(--accent);
+  }
+  .hero-head .big-ava {
+    width: 72px; height: 72px; border-radius: 16px; display: flex; align-items: center;
+    justify-content: center; font-size: 30px; font-weight: 700; color: #fff;
+  }
+  .hero-head .info { flex: 1; min-width: 220px; }
+  .hero-head .info h2 { margin: 0; font-size: 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .hero-head .info .title { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .badges { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.role { color: #0f1420; font-weight: 600; border: none; }
+  .stars { color: var(--accent); letter-spacing: 2px; font-size: 13px; }
+  .desc { color: var(--muted); font-size: 13px; margin-top: 10px; line-height: 1.6; }
+
+  .sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 16px; }
+  .section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .section h3 { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .section .count { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .section.good h3 { color: var(--good); }
+  .section.counter h3 { color: var(--counter); }
+  .section.feared h3 { color: var(--feared); }
+  .section.empty h3 { color: var(--muted); }
+
+  .rel {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 10px; cursor: pointer; transition: .15s;
+    border-left: 3px solid var(--line);
+  }
+  .rel:hover { border-color: var(--accent); transform: translateX(2px); }
+  .rel .top { display: flex; align-items: center; gap: 8px; }
+  .rel .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .rel .rname { font-weight: 600; font-size: 14px; }
+  .rel .rlane { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .rel .reason { font-size: 13px; color: var(--text); margin-top: 6px; line-height: 1.6; }
+  .rel .tip { font-size: 12px; color: var(--muted); margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--line); }
+  .rel .tip b { color: var(--feared); }
+  .rel .tip.adv b { color: var(--counter); }
+
+  .tool { background: var(--panel); border: 1px dashed var(--line); border-radius: 14px; padding: 16px; margin-top: 22px; }
+  .tool h3 { margin: 0 0 4px; font-size: 16px; color: var(--accent); }
+  .tool p { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .tool select {
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    padding: 9px 12px; border-radius: 8px; font-size: 14px; min-width: 200px;
+  }
+  .tool .result { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 10px; }
+
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+  .spinner {
+    width: 34px; height: 34px; border: 3px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; margin: 0 auto 14px; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err { background: rgba(231,76,60,.12); border: 1px solid #e74c3c; color: #ffb4a8;
+    padding: 14px; border-radius: 10px; font-size: 13px; line-height: 1.6; }
+  .err b { color: #ffd0c8; }
+
+  .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; line-height: 1.8; }
+  .footer code { background: var(--panel); padding: 2px 6px; border-radius: 4px; color: var(--accent); }
+
+  /* modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .overlay.show { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    width: 100%; max-width: 640px; max-height: 90vh; overflow: auto; padding: 20px; }
+  .modal h3 { margin: 0 0 4px; font-size: 18px; }
+  .modal .sub { color: var(--muted); font-size: 12px; margin: 0 0 16px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .field input, .field textarea, .field select {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 8px; padding: 9px 11px; font-size: 13px; font-family: inherit;
+  }
+  .field textarea { min-height: 180px; line-height: 1.5; resize: vertical; }
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row > div { flex: 1; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .btn { padding: 9px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); }
+  .btn.primary { background: var(--accent); color: #0f1420; border-color: var(--accent); font-weight: 600; }
+  .switch-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; }
+  .switch-row input { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="logo">⚔</span> 王者荣耀英雄对位分析</h1>
+  <p>选择英雄查看最佳队友与配合思路、克制你的英雄与应对、你克制的英雄与发挥方式。开启「实时大模型」可由 AI 实时分析任意英雄。</p>
+  <div class="topbar">
+    <div id="modePill" class="mode-pill" onclick="openSettings()">实时大模型：关</div>
+    <button class="gear" title="设置" onclick="openSettings()">⚙</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <input id="search" class="search" placeholder="搜索英雄名 / 称号 / 标签…" />
+    <div class="free">
+      <input id="freeName" placeholder="或输入任意英雄名，点「分析」(实时模式可查全部)" />
+      <button onclick="freeQuery()">分析</button>
+    </div>
+    <div id="roleTabs" class="role-tabs"></div>
+  </div>
+
+  <div id="grid" class="grid"></div>
+
+  <div id="detail" class="detail">
+    <button class="back" onclick="showGrid()">← 返回英雄列表</button>
+    <div id="detailBody"></div>
+  </div>
+
+  <div class="tool">
+    <h3>🎯 针对敌方英雄：选谁来 Counter？</h3>
+    <p>选一个你面对的敌方英雄，下方列出能够克制他的我方英雄及克制思路（实时模式下可查任意英雄）。</p>
+    <select id="enemySelect"></select>
+    <div id="counterResult" class="result"></div>
+  </div>
+
+  <div class="footer">
+    内置 <code>HEROES</code> 数据集作为离线/兜底；开启「实时大模型」后，分析由大模型按需生成。<br/>
+    大模型查询 Prompt 可在设置中查看与修改；API Key 仅保存在你本地浏览器（localStorage）。
+  </div>
+</div>
+
+<!-- 设置弹窗 -->
+<div id="overlay" class="overlay" onclick="if(event.target===this)closeSettings()">
+  <div class="modal">
+    <h3>⚙ 大模型设置</h3>
+    <p class="sub">支持任意 OpenAI 兼容接口（DeepSeek / 通义千问 / 智谱 GLM / Kimi / OpenAI 等）。密钥仅存于本地。</p>
+
+    <div class="field">
+      <label>服务商预设</label>
+      <select id="cfgPreset" onchange="applyPreset()">
+        <option value="custom">自定义</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="qwen">通义千问 (DashScope)</option>
+        <option value="glm">智谱 GLM</option>
+        <option value="moonshot">Kimi (Moonshot)</option>
+        <option value="openai">OpenAI</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>API Base URL</label>
+        <input id="cfgBase" placeholder="https://api.deepseek.com/v1" />
+      </div>
+      <div class="field">
+        <label>模型名 (model)</label>
+        <input id="cfgModel" placeholder="deepseek-chat" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>API Key</label>
+      <input id="cfgKey" type="password" placeholder="sk-..." />
+      <div class="hint">不会上传到任何服务器，仅用于浏览器向服务商发起请求。</div>
+    </div>
+
+    <div class="switch-row">
+      <input id="cfgEnabled" type="checkbox" onchange="syncPill()" />
+      <label style="margin:0;color:var(--text);font-size:13px;">启用「实时大模型分析」（关闭则使用内置数据）</label>
+    </div>
+
+    <div class="field">
+      <label>查询 Prompt（系统指令，可修改）</label>
+      <textarea id="cfgPrompt"></textarea>
+      <div class="hint">模型需返回严格 JSON；下方为默认设计的 Prompt。</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSettings()">取消</button>
+      <button class="btn primary" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   内置英雄数据（离线/兜底，也作为英雄选择器目录）
+   完整 Schema 见文件顶部注释（partners / counters）。
+   开启实时大模型后，详情分析由 LLM 返回，不再依赖此数据。
+   ============================================================ */
+const ROLES = {
+  "战士": { color: "var(--warrior)" }, "坦克": { color: "var(--tank)" },
+  "法师": { color: "var(--mage)" }, "射手": { color: "var(--marksman)" },
+  "刺客": { color: "var(--assassin)" }, "辅助": { color: "var(--support)" }
+};
+const roleColor = r => (ROLES[r] && ROLES[r].color) || "var(--unknown)";
+
+const HEROES = [
+  { id:"lubu", name:"吕布", title:"战神", role:"战士", lane:"对抗路", difficulty:3, tags:["真实伤害","团战","肉盾"],
+    desc:"真实伤害无视护盾，对线与团战打肉能力极强。",
+    partners:[{hero:"guiyuguizi",reason:"钩子开团把人拉进吕布大招范围，配合真伤秒杀。"},{hero:"wangzhaojun",reason:"减速留人，配合吕布大招范围真伤收割。"},{hero:"sunbin",reason:"加速拉扯让吕布更舒服地进场开大。"}],
+    counters:[{hero:"zhangfei",advantage:"真伤无视护盾，张飞开大也扛不住吕布真伤。",avoid:"张飞先用二技能护盾规避真伤期，团战先手开大逼吕布交大再反打。"},{hero:"baiqi",advantage:"真伤打肉极快，白起嘲讽期间被真伤灌死。",avoid:"白起等吕布大招结束再进场，避免被真伤+嘲讽双控。"},{hero:"lianpo",advantage:"真伤破霸体肉盾，硬刚不虚。",avoid:"廉颇用霸体躲吕布一技能击飞，拉扯消耗。"},{hero:"chengyaojin",advantage:"真伤压制回血，程咬金大招回血被真伤抵消。",avoid:"程咬金带线牵制，避免正面团被吕布真伤。"}]},
+  { id:"huamulan", name:"花木兰", title:"剑舞者", role:"战士", lane:"对抗路", difficulty:4, tags:["沉默","爆发","轻重剑"],
+    desc:"轻剑沉默接重剑爆发，切后排与单杀能力强。",
+    partners:[{hero:"guiyuguizi",reason:"开团拉人给木兰稳定切后排。"},{hero:"niumo",reason:"团控留人配合木兰重剑一套。"}],
+    counters:[{hero:"angela",advantage:"沉默打断安琪拉读条，重剑一套秒杀。",avoid:"安琪拉留闪现躲木兰重剑，贴墙放技能。"},{hero:"luban",advantage:"突进沉默秒站桩无位移射手。",avoid:"鲁班靠辅助保护，保持距离用扫射。"},{hero:"zhenji",advantage:"沉默断大，重剑强切。",avoid:"甄姬站位靠后，靠团控反打。"}]},
+  { id:"kai", name:"铠", title:"破灭刀锋", role:"战士", lane:"对抗路", difficulty:2, tags:["开大单挑","格挡","爆发"],
+    desc:"开大单挑近乎无敌，专治脆皮与落单目标。",
+    partners:[{hero:"guiyuguizi",reason:"开团拉人给铠单挑环境。"},{hero:"niumo",reason:"团控留人配合铠开大强切。"}],
+    counters:[{hero:"houyi",advantage:"开大单挑秒射手。",avoid:"后羿靠辅助与控制保命，团战抱团不落单。"},{hero:"sunshangxiang",advantage:"单挑爆发碾压灵活射手。",avoid:"孙尚香用位移拉扯，不落单。"},{hero:"zhugeliang",advantage:"单挑强切脆皮法师。",avoid:"诸葛亮用位移规避，等铠大招结束再上。"}]},
+  { id:"laofuzi", name:"老夫子", title:"至圣先师", role:"战士", lane:"对抗路", difficulty:3, tags:["捆人","单带","免伤"],
+    desc:"二技能免伤单挑强，大招捆人单带牵制。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合夫子捆人强杀。"},{hero:"dajiao",reason:"大乔传送体系配合夫子单带运营。"}],
+    counters:[{hero:"jialuo",advantage:"捆住秒杀无位移射手。",avoid:"伽罗靠超远射程风筝，不进夫子大招范围。"},{hero:"luban",advantage:"捆住真伤免伤硬刚。",avoid:"鲁班靠辅助保护，不落单。"},{hero:"chengyaojin",advantage:"免伤对拼压制回血。",avoid:"程咬金带线牵制，避免被捆。"}]},
+  { id:"guanyu", name:"关羽", title:"武圣", role:"战士", lane:"对抗路", difficulty:5, tags:["冲锋","推人","机动"],
+    desc:"冲锋推人扰乱阵型，绕后切后排能力强。",
+    partners:[{hero:"guiyuguizi",reason:"开团留人配合关羽绕后推。"},{hero:"wangzhaojun",reason:"减速留人配合关羽冲锋推散。"}],
+    counters:[{hero:"houyi",advantage:"冲锋推散站位秒射手。",avoid:"后羿靠控制与抱团，避免被绕后。"},{hero:"zhenji",advantage:"推人打断站位。",avoid:"甄姬靠团控反打，站位靠后。"},{hero:"luban",advantage:"绕后推人秒杀。",avoid:"鲁班靠辅助保护。"}]},
+  { id:"machao", name:"马超", title:"冷晖之枪", role:"战士", lane:"对抗路", difficulty:5, tags:["高机动","收枪","戳"],
+    desc:"高机动收枪戳枪，持续输出与快速支援。",
+    partners:[{hero:"guiyuguizi",reason:"开团留人配合马超戳枪。"},{hero:"sunbin",reason:"加速让马超更灵活。"}],
+    counters:[{hero:"luban",advantage:"机动戳枪秒站桩。",avoid:"鲁班靠辅助保护。"},{hero:"angela",advantage:"机动规避读条强切。",avoid:"安琪拉留控制自保。"}]},
+  { id:"zhangfei", name:"张飞", title:"禁血狂兽", role:"坦克", lane:"游走", difficulty:2, tags:["护盾","开团","变身"],
+    desc:"变身为团队套盾开团，强力保护后排。",
+    partners:[{hero:"houyi",reason:"套盾保护站桩射手。"},{hero:"luban",reason:"抗伤保后排输出。"},{hero:"caiwenji",reason:"双重保护体系，后排极难被切。"},{hero:"jialuo",reason:"套盾抵消伽罗被切风险。"}],
+    counters:[{hero:"angela",advantage:"套盾抗爆发保后排。",avoid:"安琪拉找时机秒杀未变身的张飞。"},{hero:"zhenji",advantage:"开团打乱甄姬站位。",avoid:"甄姬靠团控反打。"}]},
+  { id:"niumo", name:"牛魔", title:"牛魔王", role:"坦克", lane:"辅助", difficulty:2, tags:["团控","双抗","保护"],
+    desc:"被动双抗加成，团控开团保护射手。",
+    partners:[{hero:"houyi",reason:"团控留人保护射手。"},{hero:"sunshangxiang",reason:"开团配合爆发射手。"},{hero:"luban",reason:"保护无位移射手。"}],
+    counters:[{hero:"luban",advantage:"团控留住无位移射手。",avoid:"鲁班靠走位与闪现躲控制。"},{hero:"zhenji",advantage:"开团秒杀站位。",avoid:"甄姬靠团控反打。"}]},
+  { id:"lianpo", name:"廉颇", title:"无畏之魂", role:"坦克", lane:"对抗路", difficulty:2, tags:["霸体","控制","开团"],
+    desc:"多段霸体控制，先手开团抗伤。",
+    partners:[{hero:"houyi",reason:"控制链保护射手。"},{hero:"angela",reason:"控制后接安琪拉爆发。"}],
+    counters:[{hero:"zhenji",advantage:"霸体硬冲打断。",avoid:"甄姬靠团控反打。"},{hero:"luban",advantage:"控制链秒杀。",avoid:"鲁班靠保护。"}]},
+  { id:"baiqi", name:"白起", title:"最终兵器", role:"坦克", lane:"对抗路", difficulty:2, tags:["嘲讽","续航","团控"],
+    desc:"大招嘲讽群控，反手开团能力强。",
+    partners:[{hero:"angela",reason:"嘲讽后接安琪拉爆发。"},{hero:"wangzhaojun",reason:"控制后接王昭君范围。"},{hero:"diaochan",reason:"嘲讽留人配合貂蝉真伤。"}],
+    counters:[{hero:"houyi",advantage:"嘲讽控住站桩射手。",avoid:"后羿靠辅助保命。"},{hero:"zhenji",advantage:"嘲讽打断。",avoid:"甄姬靠团控。"}]},
+  { id:"chengyaojin", name:"程咬金", title:"热血の男", role:"坦克", lane:"对抗路", difficulty:2, tags:["回血","带线","骚扰"],
+    desc:"大招回血带线牵制，单带骚扰能力强。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合程咬金分推。"},{hero:"sunbin",reason:"加速拉扯体系。"}],
+    counters:[{hero:"luban",advantage:"回血扛伤强切。",avoid:"鲁班靠辅助与真伤英雄 counter。"},{hero:"houyi",advantage:"带线牵制分推。",avoid:"后羿跟团不落单。"}]},
+  { id:"diaochan", name:"貂蝉", title:"绝世舞姬", role:"法师", lane:"中路", difficulty:4, tags:["真实伤害","续航","位移"],
+    desc:"真伤+位移续航，团战跳舞收割。",
+    partners:[{hero:"guiyuguizi",reason:"开团拉人进貂蝉圈。"},{hero:"sunbin",reason:"加速拉扯让貂蝉更舒服。"},{hero:"baiqi",reason:"嘲讽留人配合貂蝉真伤。"}],
+    counters:[{hero:"zhangfei",advantage:"真伤打肉，位移规避。",avoid:"张飞变身后套盾拉扯。"},{hero:"baiqi",advantage:"真伤续航打坦。",avoid:"白起嘲讽控住貂蝉。"},{hero:"lianpo",advantage:"真伤破霸体。",avoid:"廉颇霸体躲位移。"}]},
+  { id:"wangzhaojun", name:"王昭君", title:"凛冬已至", role:"法师", lane:"中路", difficulty:2, tags:["团控","减速","护盾"],
+    desc:"大招范围减速团控，守线与消耗强。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合王昭君大招。"},{hero:"lianpo",reason:"控制链配合。"},{hero:"guanyu",reason:"减速留人配合关羽冲锋。"}],
+    counters:[{hero:"guanyu",advantage:"减速留住关羽冲锋。",avoid:"关羽用净化/霸体解减速。"},{hero:"machao",advantage:"减速限制机动。",avoid:"马超用位移规避。"},{hero:"luban",advantage:"大招范围秒站桩。",avoid:"鲁班靠走位。"}]},
+  { id:"angela", name:"安琪拉", title:"暗夜萝莉", role:"法师", lane:"中路", difficulty:1, tags:["爆发","控制","读条"],
+    desc:"二技能眩晕接大招秒杀脆皮。",
+    partners:[{hero:"guiyuguizi",reason:"开团拉人接安琪拉爆发。"},{hero:"baiqi",reason:"控制后接爆发。"}],
+    counters:[{hero:"luban",advantage:"眩晕接大招秒站桩。",avoid:"鲁班靠走位与辅助。"},{hero:"houyi",advantage:"控制爆发秒。",avoid:"后羿靠控制反打。"},{hero:"zhenji",advantage:"先手眩晕秒。",avoid:"甄姬靠团控。"}]},
+  { id:"zhugeliang", name:"诸葛亮", title:"绝代智谋", role:"法师", lane:"中路", difficulty:3, tags:["位移","收割","爆发"],
+    desc:"位移穿梭，被动收割残血。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合诸葛亮收割。"},{hero:"niumo",reason:"控制留人。"}],
+    counters:[{hero:"luban",advantage:"位移强切秒。",avoid:"鲁班靠保护。"},{hero:"houyi",advantage:"位移规避强切。",avoid:"后羿靠控制。"}]},
+  { id:"yingzheng", name:"嬴政", title:"王者独尊", role:"法师", lane:"中路", difficulty:2, tags:["远程poke","清线","大招"],
+    desc:"远程飞剑消耗，大招清场。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合嬴政大招清场。"},{hero:"zhangfei",reason:"保护保障输出环境。"}],
+    counters:[{hero:"luban",advantage:"远程poke消耗站桩。",avoid:"鲁班靠走位。"},{hero:"houyi",advantage:"大招远程清场。",avoid:"后羿靠位移。"}]},
+  { id:"zhenji", name:"甄姬", title:"洛神降临", role:"法师", lane:"中路", difficulty:1, tags:["团控","弹弹乐","范围"],
+    desc:"技能弹射团控，团战范围控制。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合甄姬团控。"},{hero:"baiqi",reason:"嘲讽后接范围。"}],
+    counters:[{hero:"luban",advantage:"范围团控秒。",avoid:"鲁班靠走位。"},{hero:"houyi",advantage:"团控秒。",avoid:"后羿靠控制。"}]},
+  { id:"houyi", name:"后羿", title:"半神之弓", role:"射手", lane:"发育路", difficulty:2, tags:["站桩","大招控","分裂"],
+    desc:"站桩高输出，大招远程开团控制。",
+    partners:[{hero:"zhangfei",reason:"套盾保护站桩。"},{hero:"niumo",reason:"团控保护。"},{hero:"caiwenji",reason:"回血续航保护。"},{hero:"mingshiyin",reason:"连线增益提升输出。"}],
+    counters:[{hero:"luban",advantage:"站桩对拼胜出。",avoid:"鲁班靠位移/保护。"},{hero:"zhenji",advantage:"大招控住秒。",avoid:"甄姬靠团控。"}]},
+  { id:"luban", name:"鲁班七号", title:"机关造物", role:"射手", lane:"发育路", difficulty:1, tags:["站桩","扫射","爆发"],
+    desc:"被动扫射爆发，站桩输出但无位移。",
+    partners:[{hero:"zhangfei",reason:"套盾保护无位移。"},{hero:"niumo",reason:"控制保护。"},{hero:"caiwenji",reason:"回血续航。"},{hero:"mingshiyin",reason:"连线增益。"}],
+    counters:[{hero:"chengyaojin",advantage:"扫射打肉。",avoid:"程咬金带线牵制。"},{hero:"baiqi",advantage:"扫射消耗。",avoid:"白起嘲讽反打。"}]},
+  { id:"makeluobo", name:"马可波罗", title:"风之子", role:"射手", lane:"发育路", difficulty:3, tags:["真实伤害","位移","灵活"],
+    desc:"一三技能真伤+位移，克制坦克。",
+    partners:[{hero:"yao",reason:"附身提供护盾保护。"},{hero:"mingshiyin",reason:"连线增益真伤输出。"},{hero:"guiyuguizi",reason:"开团配合马可真伤。"}],
+    counters:[{hero:"zhangfei",advantage:"真伤破盾打肉。",avoid:"张飞套盾拉扯。"},{hero:"baiqi",advantage:"真伤打坦。",avoid:"白起嘲讽。"},{hero:"lianpo",advantage:"真伤破霸体。",avoid:"廉颇霸体。"},{hero:"lubu",advantage:"真伤对真伤灵活胜出。",avoid:"吕布用大招范围逼走位。"}]},
+  { id:"gongsunli", name:"公孙离", title:"幻舞玲珑", role:"射手", lane:"发育路", difficulty:5, tags:["多段位移","风筝","伞"],
+    desc:"多段位移风筝，克制近身刺客。",
+    partners:[{hero:"yao",reason:"附身保护灵活射手。"},{hero:"mingshiyin",reason:"连线增益。"}],
+    counters:[{hero:"lanlingwang",advantage:"位移风筝秒刺客。",avoid:"兰陵王隐身找时机。"},{hero:"libai",advantage:"位移规避无法选中。",avoid:"李白刷大找破绽。"},{hero:"nakelulu",advantage:"风筝消耗。",avoid:"娜可露露等落伞。"}]},
+  { id:"sunshangxiang", name:"孙尚香", title:"千金重弩", role:"射手", lane:"发育路", difficulty:3, tags:["位移","爆发","翻滚"],
+    desc:"翻滚位移爆发，灵活输出。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合香香爆发。"},{hero:"zhangfei",reason:"保护保障输出。"}],
+    counters:[{hero:"luban",advantage:"位移爆发碾压。",avoid:"鲁班靠保护。"},{hero:"zhenji",advantage:"位移规避强切。",avoid:"甄姬靠团控。"}]},
+  { id:"jialuo", name:"伽罗", title:"炽翼之刃", role:"射手", lane:"发育路", difficulty:2, tags:["超远射程","减速","破盾"],
+    desc:"超远射程破盾减速，压制护盾阵容。",
+    partners:[{hero:"zhangfei",reason:"套盾保护无位移。"},{hero:"caiwenji",reason:"回血续航。"},{hero:"mingshiyin",reason:"连线增益。"}],
+    counters:[{hero:"zhangfei",advantage:"破盾远程消耗。",avoid:"张飞变身后近身。"},{hero:"lianpo",advantage:"远程破盾。",avoid:"廉颇霸体近身。"},{hero:"chengyaojin",advantage:"远程减速消耗。",avoid:"程咬金带线。"}]},
+  { id:"libai", name:"李白", title:"青莲剑仙", role:"刺客", lane:"打野", difficulty:4, tags:["无法选中","位移","刷大"],
+    desc:"一技能位移+大招无法选中，切后排。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合李白切后排。"},{hero:"niumo",reason:"控制留人。"}],
+    counters:[{hero:"angela",advantage:"无法选中躲读条强切。",avoid:"安琪拉留控制自保。"},{hero:"zhenji",advantage:"刷大躲技能秒。",avoid:"甄姬靠团控。"},{hero:"houyi",advantage:"位移切后排。",avoid:"后羿靠控制。"},{hero:"luban",advantage:"无法选中切。",avoid:"鲁班靠保护。"}]},
+  { id:"hanxin", name:"韩信", title:"国士无双", role:"刺客", lane:"打野", difficulty:4, tags:["多位移","偷塔","机动"],
+    desc:"多段位移偷塔带线，灵活骚扰。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合韩信切。"},{hero:"sunbin",reason:"加速拉扯。"}],
+    counters:[{hero:"luban",advantage:"位移强切。",avoid:"鲁班靠保护。"},{hero:"houyi",advantage:"突进切。",avoid:"后羿靠控制。"}]},
+  { id:"lanlingwang", name:"兰陵王", title:"暗影刀锋", role:"刺客", lane:"打野", difficulty:3, tags:["隐身","秒脆皮","标记"],
+    desc:"隐身接近秒杀后排脆皮。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合兰陵王切。"},{hero:"niumo",reason:"控制留人。"}],
+    counters:[{hero:"houyi",advantage:"隐身秒无位移射手。",avoid:"后羿靠辅助探视野。"},{hero:"luban",advantage:"隐身秒。",avoid:"鲁班靠保护。"},{hero:"zhenji",advantage:"隐身秒。",avoid:"甄姬靠团控。"},{hero:"wangzhaojun",advantage:"隐身切。",avoid:"王昭君留控制。"},{hero:"angela",advantage:"隐身秒。",avoid:"安琪拉留控制。"}]},
+  { id:"sunwukong", name:"孙悟空", title:"齐天大圣", role:"刺客", lane:"打野", difficulty:3, tags:["爆发","护盾","分身"],
+    desc:"一棒爆发带护盾，切脆皮。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合悟空切。"},{hero:"niumo",reason:"控制留人。"}],
+    counters:[{hero:"luban",advantage:"爆发秒。",avoid:"鲁班靠保护。"},{hero:"houyi",advantage:"爆发切。",avoid:"后羿靠控制。"},{hero:"zhenji",advantage:"爆发秒。",avoid:"甄姬靠团控。"}]},
+  { id:"nakelulu", name:"娜可露露", title:"鹰之守护", role:"刺客", lane:"打野", difficulty:3, tags:["爆发","机动","鹰"],
+    desc:"大招机动爆发，秒杀脆皮。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合娜可露露。"},{hero:"niumo",reason:"控制留人。"}],
+    counters:[{hero:"luban",advantage:"爆发秒。",avoid:"鲁班靠保护。"},{hero:"houyi",advantage:"机动切。",avoid:"后羿靠控制。"},{hero:"jialuo",advantage:"机动切。",avoid:"伽罗靠保护。"}]},
+  { id:"caiwenji", name:"蔡文姬", title:"天籁弦音", role:"辅助", lane:"游走", difficulty:1, tags:["回血","控制","保护"],
+    desc:"持续回血+控制，保护后排。",
+    partners:[{hero:"luban",reason:"回血续航保护站桩。"},{hero:"houyi",reason:"保护射手。"},{hero:"jialuo",reason:"保护无位移。"},{hero:"sunshangxiang",reason:"保护灵活射手。"}],
+    counters:[{hero:"angela",advantage:"回血抗消耗。",avoid:"安琪拉出梦魇减疗。"},{hero:"zhenji",advantage:"回血续航。",avoid:"甄姬出梦魇。"}]},
+  { id:"sunbin", name:"孙膑", title:"时空之旅", role:"辅助", lane:"游走", difficulty:2, tags:["加速","抬血","沉默"],
+    desc:"加速抬血，拉扯消耗阵容核心。",
+    partners:[{hero:"diaochan",reason:"加速拉扯配合貂蝉。"},{hero:"makeluobo",reason:"拉扯保护马可。"},{hero:"gongsunli",reason:"拉扯保护公孙离。"}],
+    counters:[{hero:"angela",advantage:"加速规避读条。",avoid:"安琪拉留控制。"},{hero:"zhenji",advantage:"抬血抗消耗。",avoid:"甄姬出减疗。"}]},
+  { id:"dajiao", name:"大乔", title:"沧海之曜", role:"辅助", lane:"游走", difficulty:4, tags:["传送","沉默","回血"],
+    desc:"传送支援与沉默，运营单带体系。",
+    partners:[{hero:"laofuzi",reason:"单带体系核心配合。"},{hero:"gongsunli",reason:"传送保护灵活射手。"},{hero:"sunshangxiang",reason:"传送运营。"}],
+    counters:[{hero:"angela",advantage:"沉默打断读条。",avoid:"安琪拉留闪现。"}]},
+  { id:"zhuangzhou", name:"庄周", title:"逍遥幻梦", role:"辅助", lane:"游走", difficulty:2, tags:["解控","免控","减伤"],
+    desc:"大招解控免控，克制控制阵容。",
+    partners:[{hero:"houyi",reason:"免控保护站桩。"},{hero:"luban",reason:"解控保护无位移。"}],
+    counters:[{hero:"wangzhaojun",advantage:"解控抵消减速团控。",avoid:"王昭君用大招逼庄周交大。"},{hero:"baiqi",advantage:"解控解嘲讽。",avoid:"白起等庄周大招结束。"},{hero:"huamulan",advantage:"解控解沉默。",avoid:"花木兰快速连招。"},{hero:"zhenji",advantage:"解控抵消团控。",avoid:"甄姬出减疗。"}]},
+  { id:"donghuang", name:"东皇太一", title:"暗夜之子", role:"辅助", lane:"游走", difficulty:2, tags:["压制","吸血","球"],
+    desc:"大招压制，专治花里胡哨与突进。",
+    partners:[{hero:"guiyuguizi",reason:"开团配合东皇压制。"},{hero:"kai",reason:"压制后给铠单挑环境。"}],
+    counters:[{hero:"libai",advantage:"压制打断无法选中。",avoid:"李白等东皇交大再进场。"},{hero:"diaochan",advantage:"压制控住。",avoid:"貂蝉用位移规避。"},{hero:"guanyu",advantage:"压制控住冲锋。",avoid:"关羽用净化解。"},{hero:"machao",advantage:"压制。",avoid:"马超用位移。"},{hero:"huamulan",advantage:"压制。",avoid:"花木兰快速连招。"},{hero:"zhugeliang",advantage:"压制。",avoid:"诸葛亮用位移。"}]},
+  { id:"guiyuguizi", name:"鬼谷子", title:"万物有灵", role:"辅助", lane:"游走", difficulty:4, tags:["隐身开团","拉人","加速"],
+    desc:"隐身开团拉人，几乎所有阵容的万金油开团点。",
+    partners:[{hero:"lubu",reason:"拉人进吕布大招。"},{hero:"diaochan",reason:"拉人进貂蝉圈。"},{hero:"libai",reason:"开团配合李白切后排。"}],
+    counters:[{hero:"lanlingwang",advantage:"探视野显形克制隐身刺客。",avoid:"兰陵王避开鬼谷子视野球。"}]},
+  { id:"yao", name:"瑶", title:"鹿灵守心", role:"辅助", lane:"游走", difficulty:2, tags:["附身","护盾","控制"],
+    desc:"附身提供护盾与控制，保护灵活射手。",
+    partners:[{hero:"makeluobo",reason:"附身保护马可。"},{hero:"gongsunli",reason:"附身保护公孙离。"}], counters:[]},
+  { id:"mingshiyin", name:"明世隐", title:"虹之兽", role:"辅助", lane:"游走", difficulty:2, tags:["连线","增益","法术"],
+    desc:"连线提供攻击/防御增益，提升核心输出。",
+    partners:[{hero:"houyi",reason:"连线增益提升站桩输出。"},{hero:"luban",reason:"连线增益无位移射手。"},{hero:"jialuo",reason:"连线增益伽罗。"},{hero:"makeluobo",reason:"连线增益真伤马可。"}], counters:[]}
+];
+
+const byId = {}; HEROES.forEach(h => byId[h.id] = h);
+const byName = {}; HEROES.forEach(h => byName[h.name] = h);
+
+/* 默认查询 Prompt（系统指令） */
+const DEFAULT_PROMPT = `你是一位资深的《王者荣耀》对战分析师，精通所有英雄的技能机制、定位、阵容搭配与相互克制关系。
+任务：根据用户指定的英雄，输出该英雄的详细对位分析。
+
+硬性要求：
+1. 只输出一个 JSON 对象，不要包含任何解释性文字，不要用 Markdown 代码块包裹。
+2. 所有英雄名称必须是《王者荣耀》中真实存在的英雄（如：吕布、马可波罗、东皇太一、鬼谷子等）。
+3. 分析必须基于英雄真实技能机制（真实伤害、控制链、位移、护盾、回复、隐身、射程等），具体、可操作，避免空泛。
+4. 每个 reason / advantage / avoid 控制在 1-2 句。
+5. 数量要求：partners 4-6 个，counters 4-6 个，fearedBy 4-6 个。
+
+字段含义：
+- partners：最适合与该英雄当队友的英雄，reason 写清楚二人如何配合（开团、保护、补伤害、拉扯等）。
+- counters：该英雄能够克制的对方英雄，advantage 写该英雄靠什么机制压制对方，avoid 写对方被克制时应如何规避/反打。
+- fearedBy：能够克制该英雄的对方英雄，advantage 写对方靠什么机制压制该英雄，avoid 写该英雄应如何避免被克制（站位、出装、等技能、叫辅助等）。
+
+严格按以下 JSON 结构输出：
+{
+  "name": "英雄名",
+  "title": "称号",
+  "role": "战士|坦克|法师|射手|刺客|辅助",
+  "lane": "对抗路|中路|发育路|打野|游走",
+  "difficulty": 3,
+  "tags": ["标签1","标签2"],
+  "desc": "一句话定位",
+  "partners": [ {"hero":"英雄名","reason":"配合思路"} ],
+  "counters": [ {"hero":"英雄名","advantage":"克制点","avoid":"对方应对"} ],
+  "fearedBy": [ {"hero":"英雄名","advantage":"对方克制点","avoid":"如何避免被克制"} ]
+}`;
+
+const PRESETS = {
+  deepseek: { base:"https://api.deepseek.com/v1", model:"deepseek-chat" },
+  qwen:     { base:"https://dashscope.aliyuncs.com/compatible-mode/v1", model:"qwen-plus" },
+  glm:      { base:"https://open.bigmodel.cn/api/paas/v4", model:"glm-4" },
+  moonshot: { base:"https://api.moonshot.cn/v1", model:"moonshot-v1-8k" },
+  openai:   { base:"https://api.openai.com/v1", model:"gpt-4o-mini" }
+};
+
+/* ===================== 配置持久化 ===================== */
+const CFG_KEY = "wzry_llm_cfg";
+// 默认预填 DeepSeek：用户只需粘贴 API Key 即可启用（无 Key 时自动回退内置数据）
+const DEFAULT_CFG = {
+  base: PRESETS.deepseek.base,
+  model: PRESETS.deepseek.model,
+  key: "",
+  enabled: true,
+  prompt: DEFAULT_PROMPT
+};
+function loadCfg(){
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch(e){ saved = {}; }
+  return { ...DEFAULT_CFG, ...saved };
+}
+function matchPreset(base, model){
+  for (const k in PRESETS){ if (PRESETS[k].base === base && PRESETS[k].model === model) return k; }
+  return "custom";
+}
+function saveCfgObj(o){ localStorage.setItem(CFG_KEY, JSON.stringify(o)); }
+function llmActive(){ const c = loadCfg(); return !!(c.enabled && c.key && c.base && c.model); }
+
+/* ===================== 反向推导（内置数据用） ===================== */
+function whoCounters(heroId){
+  const list = [];
+  HEROES.forEach(h => (h.counters||[]).forEach(c => { if(c.hero===heroId) list.push({from:h, ...c}); }));
+  return list;
+}
+function builtinHeroObj(id){
+  const h = byId[id];
+  const feared = whoCounters(id).map(f => ({ hero:f.from.name, advantage:f.advantage, avoid:f.avoid }));
+  return { name:h.name, title:h.title, role:h.role, lane:h.lane, difficulty:h.difficulty,
+           tags:h.tags, desc:h.desc, partners:h.partners.map(p=>({hero:byId[p.hero]?byId[p.hero].name:p.hero, reason:p.reason})),
+           counters:h.counters.map(c=>({hero:byId[c.hero]?byId[c.hero].name:c.hero, advantage:c.advantage, avoid:c.avoid})),
+           fearedBy:feared, _src:"local" };
+}
+
+/* ===================== 大模型调用 ===================== */
+const cache = {}; // 内存缓存，避免重复请求
+async function doFetch(url, key, body){
+  const res = await fetch(url, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + key },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok){ const t = await res.text().catch(()=> ""); throw new Error("API "+res.status+"：" + t.slice(0,300)); }
+  return res.json();
+}
+function parseContent(data){
+  let content = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+  content = content.trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const obj = JSON.parse(content);
+  obj._src = "llm";
+  return obj;
+}
+async function fetchAnalysis(heroName, promptText){
+  const c = loadCfg();
+  const url = (c.base||"").replace(/\/$/,"") + "/chat/completions";
+  const baseBody = {
+    model: c.model,
+    messages: [
+      { role:"system", content: promptText || DEFAULT_PROMPT },
+      { role:"user", content: `请分析英雄：${heroName}` }
+    ],
+    temperature: 0.7
+  };
+  // 先带 json_object；部分兼容接口不支持该字段，失败则去掉重试
+  try {
+    const data = await doFetch(url, c.key, { ...baseBody, response_format:{ type:"json_object" } });
+    return parseContent(data);
+  } catch(e){
+    if(/API 4\d\d/.test(e.message)){
+      const data = await doFetch(url, c.key, baseBody);
+      return parseContent(data);
+    }
+    throw e;
+  }
+}
+
+/* ===================== 渲染 ===================== */
+let activeRole = "全部";
+let keyword = "";
+
+function initials(name){ return (name||"?").slice(0,1); }
+function metaByName(name){ const h = byName[name]; return { name, role: h? h.role : "未知", lane: h? h.lane : "" }; }
+
+function renderRoleTabs(){
+  const tabs = ["全部", ...Object.keys(ROLES)];
+  const el = document.getElementById("roleTabs"); el.innerHTML = "";
+  tabs.forEach(t => {
+    const b = document.createElement("div");
+    b.className = "role-tab" + (t===activeRole ? " active":"");
+    b.textContent = t==="全部" ? "全部" : t;
+    if(t!=="全部") b.style.background = (t===activeRole)? roleColor(t) : "var(--panel)";
+    b.onclick = () => { activeRole = t; renderRoleTabs(); renderGrid(); };
+    el.appendChild(b);
+  });
+}
+function renderGrid(){
+  const grid = document.getElementById("grid"); grid.innerHTML = "";
+  const kw = keyword.trim().toLowerCase();
+  const list = HEROES.filter(h => {
+    const roleOk = activeRole==="全部" || h.role===activeRole;
+    const kwOk = !kw || h.name.toLowerCase().includes(kw) || (h.title||"").toLowerCase().includes(kw)
+      || (h.tags||[]).some(t => t.toLowerCase().includes(kw));
+    return roleOk && kwOk;
+  });
+  if(!list.length){ grid.innerHTML = '<div style="color:var(--muted);padding:20px">没有匹配的英雄。</div>'; return; }
+  list.forEach(h => {
+    const c = document.createElement("div");
+    c.className = "hero-card"; c.style.borderTopColor = roleColor(h.role);
+    c.innerHTML = `<div class="ava" style="background:${roleColor(h.role)}">${initials(h.name)}</div>
+      <div class="nm">${h.name}</div><div class="tt">${h.title}</div>`;
+    c.onclick = () => showDetail(h.id);
+    grid.appendChild(c);
+  });
+}
+
+function relCard(meta, extraHtml, onClick){
+  const c = document.createElement("div");
+  c.className = "rel"; c.style.borderLeftColor = roleColor(meta.role);
+  c.innerHTML = `<div class="top">
+      <span class="dot" style="background:${roleColor(meta.role)}"></span>
+      <span class="rname">${meta.name}</span>
+      <span class="rlane">${meta.role}${meta.lane? "·"+meta.lane : ""}</span>
+    </div>${extraHtml}`;
+  c.onclick = onClick;
+  return c;
+}
+
+function sectionEl(cls, title, count){
+  const s = document.createElement("div");
+  s.className = "section " + cls + (count? "" : " empty");
+  s.innerHTML = `<h3>${title}</h3><div class="count">${count||"暂无数据"}</div>`;
+  return s;
+}
+
+function renderDetail(h, isEnemyOnly){
+  const srcBadge = h._src==="llm"
+    ? '<span class="src-badge llm">AI 实时</span>'
+    : '<span class="src-badge local">内置数据</span>';
+
+  let html = "";
+  if(!isEnemyOnly){
+    html += `<div class="hero-head" style="border-left-color:${roleColor(h.role)}">
+      <div class="big-ava" style="background:${roleColor(h.role)}">${initials(h.name)}</div>
+      <div class="info">
+        <h2>${h.name} <span class="badge role" style="background:${roleColor(h.role)}">${h.role}</span> ${srcBadge}</h2>
+        <div class="title">${h.title||""} · ${h.lane||""} · <span class="stars">${"★".repeat(h.difficulty||0)}${"☆".repeat(5-(h.difficulty||0))}</span> 难度</div>
+        <div class="badges">${(h.tags||[]).map(t=>`<span class="badge">#${t}</span>`).join("")}</div>
+        <div class="desc">${h.desc||""}</div>
+      </div></div>`;
+  }
+
+  const body = document.createElement("div");
+  body.innerHTML = html;
+  const sections = document.createElement("div");
+  sections.className = "sections";
+
+  // 队友
+  const s1 = sectionEl("good","🤝 最佳队友", (h.partners&&h.partners.length)?`${h.partners.length} 个推荐配合`:"");
+  (h.partners||[]).forEach(p => {
+    const meta = metaByName(p.hero);
+    s1.appendChild(relCard(meta, `<div class="reason">${p.reason||""}</div>`, () => showDetailByName(p.hero)));
+  });
+  if(!(h.partners&&h.partners.length)) s1.innerHTML += '<div class="reason" style="color:var(--muted)">暂无数据</div>';
+  sections.appendChild(s1);
+
+  // 你克制的
+  const s2 = sectionEl("counter","⚔ 你克制的英雄", (h.counters&&h.counters.length)?`${h.counters.length} 个优势对位 · 如何发挥`:"");
+  (h.counters||[]).forEach(c => {
+    const meta = metaByName(c.hero);
+    const extra = `<div class="reason">${c.advantage||""}</div>` + (c.avoid?`<div class="tip adv"><b>对方应对：</b>${c.avoid}</div>`:"");
+    s2.appendChild(relCard(meta, extra, () => showDetailByName(c.hero)));
+  });
+  if(!(h.counters&&h.counters.length)) s2.innerHTML += '<div class="reason" style="color:var(--muted)">暂无数据</div>';
+  sections.appendChild(s2);
+
+  // 克制你的
+  const s3 = sectionEl("feared","🔥 克制你的英雄", (h.fearedBy&&h.fearedBy.length)?`${h.fearedBy.length} 个劣势对位 · 如何避免`:"");
+  (h.fearedBy||[]).forEach(f => {
+    const meta = metaByName(f.hero);
+    const extra = `<div class="reason">${f.advantage||""}</div>` + (f.avoid?`<div class="tip"><b>如何避免：</b>${f.avoid}</div>`:"");
+    s3.appendChild(relCard(meta, extra, () => showDetailByName(f.hero)));
+  });
+  if(!(h.fearedBy&&h.fearedBy.length)) s3.innerHTML += '<div class="reason" style="color:var(--muted)">暂无数据</div>';
+  sections.appendChild(s3);
+
+  body.appendChild(sections);
+  return body;
+}
+
+function showLoading(msg){
+  document.getElementById("detailBody").innerHTML =
+    `<div class="loading"><div class="spinner"></div>${msg||"正在向大模型请求分析…"}</div>`;
+}
+function showError(err){
+  document.getElementById("detailBody").innerHTML =
+    `<div class="err"><b>大模型请求失败：</b>${err.message}<br/><br/>
+     请检查设置中的 API 地址 / 模型名 / Key，或暂时关闭「实时大模型」使用内置数据。</div>`;
+}
+
+/* ===================== 交互流程 ===================== */
+function showDetail(id){
+  document.getElementById("grid").style.display = "none";
+  document.querySelector(".controls").style.display = "none";
+  document.getElementById("detail").classList.add("show");
+
+  if(llmActive()){
+    const cacheKey = "id:" + id;
+    if(cache[cacheKey]){ document.getElementById("detailBody").innerHTML=""; document.getElementById("detailBody").appendChild(renderDetail(cache[cacheKey])); return; }
+    showLoading("正在分析「" + byId[id].name + "」（AI 实时）…");
+    fetchAnalysis(byId[id].name, loadCfg().prompt)
+      .then(obj => { cache[cacheKey] = obj; document.getElementById("detailBody").innerHTML=""; document.getElementById("detailBody").appendChild(renderDetail(obj)); })
+      .catch(e => { console.error(e); showError(e); });
+  } else {
+    document.getElementById("detailBody").innerHTML="";
+    document.getElementById("detailBody").appendChild(renderDetail(builtinHeroObj(id)));
+  }
+  window.scrollTo({ top:0, behavior:"smooth" });
+}
+
+function showDetailByName(name){
+  const hit = byName[name];
+  if(hit){ showDetail(hit.id); return; }
+  // 内置无此英雄：尝试实时（若开启）
+  if(llmActive()){
+    const cacheKey = "name:" + name;
+    document.getElementById("grid").style.display = "none";
+    document.querySelector(".controls").style.display = "none";
+    document.getElementById("detail").classList.add("show");
+    if(cache[cacheKey]){ document.getElementById("detailBody").innerHTML=""; document.getElementById("detailBody").appendChild(renderDetail(cache[cacheKey])); return; }
+    showLoading("正在分析「" + name + "」（AI 实时）…");
+    fetchAnalysis(name, loadCfg().prompt)
+      .then(obj => { cache[cacheKey] = obj; document.getElementById("detailBody").innerHTML=""; document.getElementById("detailBody").appendChild(renderDetail(obj)); })
+      .catch(e => { console.error(e); showError(e); });
+    window.scrollTo({ top:0, behavior:"smooth" });
+  } else {
+    alert("内置数据中没有「" + name + "」。开启「实时大模型」后可查询全部英雄。");
+  }
+}
+
+function freeQuery(){
+  const v = document.getElementById("freeName").value.trim();
+  if(!v){ return; }
+  showDetailByName(v);
+}
+
+function showGrid(){
+  document.getElementById("detail").classList.remove("show");
+  document.getElementById("grid").style.display = "grid";
+  document.querySelector(".controls").style.display = "flex";
+  renderGrid();
+}
+
+/* 敌方克制工具 */
+function renderEnemySelect(){
+  const sel = document.getElementById("enemySelect");
+  sel.innerHTML = '<option value="">— 选择一个敌方英雄 —</option>'
+    + HEROES.map(h => `<option value="${h.name}">${h.name}（${h.role}）</option>`).join("");
+  sel.onchange = () => {
+    const res = document.getElementById("counterResult"); res.innerHTML = "";
+    const name = sel.value; if(!name) return;
+    if(llmActive()){
+      showLoadingTool(res, "正在分析克制「"+name+"」…");
+      fetchAnalysis(name, loadCfg().prompt)
+        .then(obj => {
+          res.innerHTML = "";
+          (obj.fearedBy||[]).forEach(f => {
+            const meta = metaByName(f.hero);
+            const card = relCard(meta, `<div class="reason">${f.advantage||""}</div>` + (f.avoid?`<div class="tip adv"><b>对方应对：</b>${f.avoid}</div>`:""), () => showDetailByName(f.hero));
+            res.appendChild(card);
+          });
+          if(!(obj.fearedBy&&obj.fearedBy.length)) res.innerHTML = '<div style="color:var(--muted)">暂无英雄明显克制该敌人。</div>';
+        })
+        .catch(e => { res.innerHTML = '<div class="err">请求失败：'+e.message+'</div>'; });
+    } else {
+      const h = byName[name];
+      if(!h){ res.innerHTML = '<div style="color:var(--muted)">内置数据中无此英雄，开启实时大模型可查全部。</div>'; return; }
+      whoCounters(h.id).forEach(f => {
+        const meta = metaByName(f.from.name);
+        const card = relCard(meta, `<div class="reason">${f.advantage||""}</div>` + (f.avoid?`<div class="tip adv"><b>对方应对：</b>${f.avoid}</div>`:""), () => showDetail(f.from.id));
+        res.appendChild(card);
+      });
+      if(!whoCounters(h.id).length) res.innerHTML = '<div style="color:var(--muted)">暂无英雄明显克制该敌人。</div>';
+    }
+  };
+}
+function showLoadingTool(el, msg){ el.innerHTML = `<div class="loading" style="padding:20px"><div class="spinner" style="width:24px;height:24px"></div>${msg}</div>`; }
+
+/* ===================== 设置弹窗 ===================== */
+function openSettings(){
+  const c = loadCfg();
+  document.getElementById("cfgBase").value = c.base || "";
+  document.getElementById("cfgModel").value = c.model || "";
+  document.getElementById("cfgKey").value = c.key || "";
+  document.getElementById("cfgEnabled").checked = !!c.enabled;
+  document.getElementById("cfgPrompt").value = c.prompt || DEFAULT_PROMPT;
+  document.getElementById("cfgPreset").value = matchPreset(c.base, c.model);
+  syncPill();
+  document.getElementById("overlay").classList.add("show");
+}
+function closeSettings(){ document.getElementById("overlay").classList.remove("show"); }
+function applyPreset(){
+  const p = document.getElementById("cfgPreset").value;
+  if(PRESETS[p]){ document.getElementById("cfgBase").value = PRESETS[p].base; document.getElementById("cfgModel").value = PRESETS[p].model; }
+}
+function syncPill(){
+  const on = document.getElementById("cfgEnabled").checked;
+  const pill = document.getElementById("modePill");
+  pill.textContent = "实时大模型：" + (on? "开" : "关");
+  pill.classList.toggle("on", on);
+}
+function saveSettings(){
+  const c = {
+    base: document.getElementById("cfgBase").value.trim(),
+    model: document.getElementById("cfgModel").value.trim(),
+    key: document.getElementById("cfgKey").value.trim(),
+    enabled: document.getElementById("cfgEnabled").checked,
+    prompt: document.getElementById("cfgPrompt").value
+  };
+  saveCfgObj(c);
+  syncPill();
+  closeSettings();
+}
+
+document.getElementById("search").addEventListener("input", e => { keyword = e.target.value; renderGrid(); });
+
+renderRoleTabs();
+renderGrid();
+renderEnemySelect();
+syncPill();
+</script>
+</body>
+</html>
